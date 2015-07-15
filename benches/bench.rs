@@ -3,6 +3,7 @@
 extern crate test;
 extern crate http_muncher;
 
+use http_muncher::AsciiStr;
 use test::Bencher;
 
 use http_muncher::{ParserHandler, Parser};
@@ -11,34 +12,34 @@ use http_muncher::{ParserHandler, Parser};
 fn bench_request_parser(b: &mut Bencher) {
     struct TestRequestParser;
 
-    impl ParserHandler for TestRequestParser {
-        fn on_url(&mut self, url: &[u8]) -> Option<u16> {
-            assert_eq!(b"/say_hello", url);
-            None
+    impl<'a> ParserHandler<'a> for TestRequestParser {
+        fn on_url(&mut self, _: &Parser<Self>, url: &AsciiStr) -> bool {
+            assert_eq!(b"/say_hello", url.as_bytes());
+            true
         }
 
-        fn on_header_field(&mut self, hdr: &[u8]) -> Option<u16> {
-            assert!(hdr == b"Host" || hdr == b"Content-Length");
-            None
+        fn on_header_field(&mut self, _: &Parser<Self>, hdr: &AsciiStr) -> bool {
+            assert!(hdr.as_bytes() == b"Host" || hdr.as_bytes() == b"Content-Length");
+            true
         }
 
-        fn on_header_value(&mut self, val: &[u8]) -> Option<u16> {
+        fn on_header_value(&mut self, _: &Parser<Self>, val: &[u8]) -> bool {
             assert!(val == b"localhost.localdomain" || val == b"11");
-            None
+            true
         }
 
-        fn on_body(&mut self, body: &[u8]) -> Option<u16> {
+        fn on_body(&mut self, _: &Parser<Self>, body: &[u8]) -> bool {
             assert_eq!(body, b"Hello world");
-            None
+            true
         }
     }
 
     let req = b"POST /say_hello HTTP/1.1\r\nContent-Length: 11\r\nHost: localhost.localdomain\r\n\r\nHello world";
 
-    let mut handler = TestRequestParser;
-
     b.iter(|| {
-        let mut parser = Parser::request(&mut handler);
+        let mut handler = TestRequestParser;
+
+        let mut parser = Parser::request(handler);
         let parsed = parser.parse(req);
 
         assert!(parsed > 0);
